@@ -1,0 +1,2700 @@
+<!DOCTYPE html>
+<!--
+    LaGuardia Faculty Cases Analysis
+    Version 2.14 - Released February 27, 2026
+    Developed by Josh Goldblatt using Claude
+    
+    Version History:
+    v2.14 - Fixed Referral/Alert Reasons column name to match current CSV format
+    v2.13 - Fixed advisor export subtotal shading, multi-office labeling, 
+            updated notes for multi-department case handling, filename formatting
+    v2.12 - Previous version
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LaGuardia Faculty Case Analysis Dashboard v2.14</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            min-height: 100vh;
+            padding: 1.5rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .main-title {
+            font-size: 1.875rem;
+            font-weight: bold;
+            color: #1f2937;
+            margin-bottom: 2rem;
+        }
+
+        .upload-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .upload-box {
+            border: 2px dashed #d1d5db;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .upload-box:hover {
+            border-color: #60a5fa;
+        }
+
+        .upload-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+
+        .upload-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .check-icon {
+            color: #10b981;
+            width: 20px;
+            height: 20px;
+        }
+
+        .upload-button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            background: #eff6ff;
+            color: #2563eb;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            border: none;
+            width: 100%;
+        }
+
+        .upload-button:hover {
+            background: #dbeafe;
+        }
+
+        .upload-info {
+            margin-top: 0.75rem;
+            font-size: 0.75rem;
+            color: #6b7280;
+        }
+
+        .process-button {
+            width: 100%;
+            background: linear-gradient(to right, #3b82f6, #2563eb);
+            color: white;
+            font-weight: 600;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .process-button:hover:not(:disabled) {
+            background: linear-gradient(to right, #2563eb, #1d4ed8);
+        }
+
+        .process-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .progress-bar {
+            width: 100%;
+            background: #e5e7eb;
+            border-radius: 9999px;
+            height: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .progress-fill {
+            background: #3b82f6;
+            height: 0.5rem;
+            border-radius: 9999px;
+            width: 75%;
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            margin-bottom: 1.5rem;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #1f2937;
+        }
+
+        .chevron {
+            width: 24px;
+            height: 24px;
+            transition: transform 0.3s ease;
+        }
+
+        .chevron.rotated {
+            transform: rotate(90deg);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            padding: 1rem;
+            border-radius: 0.5rem;
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+        }
+
+        .stat-card.purple { background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%); }
+        .stat-card.green { background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); }
+        .stat-card.yellow { background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); }
+        .stat-card.red { background: linear-gradient(135deg, #fef2f2 0%, #fecaca 100%); }
+
+        .stat-label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #2563eb;
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-card.purple .stat-label { color: #7c3aed; }
+        .stat-card.green .stat-label { color: #059669; }
+        .stat-card.yellow .stat-label { color: #d97706; }
+        .stat-card.red .stat-label { color: #dc2626; }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #1e40af;
+        }
+
+        .stat-card.purple .stat-value { color: #6b21a8; }
+        .stat-card.green .stat-value { color: #047857; }
+        .stat-card.yellow .stat-value { color: #b45309; }
+        .stat-card.red .stat-value { color: #b91c1c; }
+
+        .table-container {
+            overflow-x: auto;
+            margin-bottom: 2rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 600px;
+        }
+
+        th, td {
+            border: 1px solid #e5e7eb;
+            padding: 0.75rem;
+            text-align: left;
+            font-size: 0.875rem;
+        }
+
+        th {
+            background: #f9fafb;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        tr:hover {
+            background: #f9fafb;
+        }
+
+        .subtotal-row {
+            background: #eff6ff !important;
+            font-weight: 600;
+        }
+
+        .grand-total-row {
+            background: #e0f2fe !important;
+            font-weight: 700;
+            color: #075985;
+        }
+
+        .special-subtotal-row {
+            background: #fffbeb !important;
+            font-weight: 600;
+        }
+
+        .dept-row {
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .dept-row:hover {
+            background: #f3f4f6 !important;
+        }
+
+        .dept-row.expandable {
+            position: relative;
+        }
+
+        .dept-row.expandable::after {
+            content: '▶';
+            position: absolute;
+            right: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            transition: transform 0.3s ease;
+            color: #6b7280;
+            font-size: 0.75rem;
+        }
+
+        .dept-row.expandable.expanded::after {
+            transform: translateY(-50%) rotate(90deg);
+        }
+
+        .advisor-row {
+            background: #fafbfc !important;
+            border-left: 3px solid #3b82f6;
+        }
+
+        .advisor-row td {
+            padding-left: 2rem;
+            font-style: italic;
+            color: #4b5563;
+            border-top: none;
+        }
+
+        .advisor-row td:first-child {
+            color: #1f2937;
+            font-weight: 500;
+        }
+
+        .advisor-row:hover {
+            background: #f1f5f9 !important;
+        }
+
+        .alert-reason-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            transition: box-shadow 0.3s ease;
+        }
+
+        .alert-reason-card:hover {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .alert-reason-title {
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 0.25rem;
+        }
+
+        .alert-reason-stats {
+            display: flex;
+            gap: 1.5rem;
+            font-size: 0.875rem;
+            color: #6b7280;
+            margin-bottom: 0.75rem;
+        }
+
+        .alert-reason-bar {
+            width: 100%;
+            background: #e5e7eb;
+            border-radius: 9999px;
+            height: 1.5rem;
+            position: relative;
+        }
+
+        .alert-reason-fill {
+            background: linear-gradient(to right, #60a5fa, #2563eb);
+            height: 1.5rem;
+            border-radius: 9999px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 0.5rem;
+            min-width: 50px;
+        }
+
+        .alert-reason-count {
+            color: white;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .outcome-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .outcome-card {
+            padding: 1rem;
+            border-radius: 0.5rem;
+            background: #f9fafb;
+        }
+
+        .outcome-card.green { background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); }
+        .outcome-card.yellow { background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); }
+        .outcome-card.purple { background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%); }
+        .outcome-card.blue { background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); }
+        .outcome-card.red { background: linear-gradient(135deg, #fef2f2 0%, #fecaca 100%); }
+        .outcome-card.orange { background: linear-gradient(135deg, #fff7ed 0%, #fed7aa 100%); }
+        .outcome-card.pink { background: linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%); }
+        .outcome-card.teal { background: linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%); }
+
+        .outcome-card.stat-card { background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%) !important; }
+        .outcome-card.stat-card.purple { background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%) !important; }
+        .outcome-card.stat-card.green { background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%) !important; }
+        .outcome-card.stat-card.yellow { background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%) !important; }
+        .outcome-card.stat-card.red { background: linear-gradient(135deg, #fef2f2 0%, #fecaca 100%) !important; }
+
+        .outcome-card .outcome-label.stat-label { color: #2563eb; }
+        .outcome-card.purple .outcome-label.stat-label { color: #7c3aed; }
+        .outcome-card.green .outcome-label.stat-label { color: #059669; }
+        .outcome-card.yellow .outcome-label.stat-label { color: #d97706; }
+        .outcome-card.red .outcome-label.stat-label { color: #dc2626; }
+
+        .outcome-card .outcome-count.stat-value { color: #1e40af; }
+        .outcome-card.purple .outcome-count.stat-value { color: #6b21a8; }
+        .outcome-card.green .outcome-count.stat-value { color: #047857; }
+        .outcome-card.yellow .outcome-count.stat-value { color: #b45309; }
+        .outcome-card.red .outcome-count.stat-value { color: #b91c1c; }
+
+        .outcome-label {
+            font-size: 0.875rem;
+            color: #6b7280;
+            margin-bottom: 0.25rem;
+        }
+
+        .outcome-value {
+            display: flex;
+            align-items: baseline;
+            gap: 0.5rem;
+        }
+
+        .outcome-count {
+            font-size: 1.25rem;
+            font-weight: bold;
+            color: #1f2937;
+        }
+
+        .outcome-percentage {
+            font-size: 0.875rem;
+            color: #6b7280;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .subsection-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #4b5563;
+            margin-bottom: 0.75rem;
+        }
+
+        .subsection {
+            margin-top: 1.5rem;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .export-button {
+            width: 100%;
+            background: linear-gradient(to right, #059669, #047857);
+            color: white;
+            font-weight: 600;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .export-button:hover:not(:disabled) {
+            background: linear-gradient(to right, #047857, #065f46);
+        }
+
+        .export-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .pdf-title {
+            text-align: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+            color: #1f2937;
+        }
+
+        .pdf-date {
+            text-align: center;
+            font-size: 0.875rem;
+            color: #6b7280;
+            margin-bottom: 2rem;
+        }
+
+        @media print {
+            body {
+                background: white;
+            }
+            .advisor-row {
+                display: table-row !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h1 class="main-title">📚 LaGuardia Faculty Case Analysis Dashboard</h1>
+            <div style="text-align: center; margin-bottom: 1rem;">
+                <div style="font-size: 0.9rem; color: #6b7280;">Version 2.14 - Released February 6, 2026</div>
+                <div style="font-size: 0.9rem; color: #6b7280;">Developed by Josh Goldblatt using Claude</div>
+            </div>
+            
+            <!-- File Upload Section -->
+            <div class="upload-grid">
+                <div class="upload-box">
+                    <div class="upload-header">
+                        <h3 class="upload-title">Advisor List CSV</h3>
+                        <span id="advisor-check" class="check-icon hidden">✓</span>
+                    </div>
+                    <input type="file" id="advisor-upload" accept=".csv">
+                    <label for="advisor-upload" class="upload-button">
+                        <span>📤</span>
+                        <span id="advisor-filename">Choose File</span>
+                    </label>
+                    <div class="upload-info">
+                        Required columns: Advisor Name, Department
+                    </div>
+                </div>
+                
+                <div class="upload-box">
+                    <div class="upload-header">
+                        <h3 class="upload-title">Cases CSV</h3>
+                        <span id="cases-check" class="check-icon hidden">✓</span>
+                    </div>
+                    <input type="file" id="cases-upload" accept=".csv">
+                    <label for="cases-upload" class="upload-button">
+                        <span>📤</span>
+                        <span id="cases-filename">Choose File</span>
+                    </label>
+                    <div class="upload-info">
+                        Required: Student ID, Case Assignees, Opened At Date, Status, Closed At Date, Closed By, Closed Reason
+                    </div>
+                </div>
+            </div>
+            
+            <button id="process-button" class="process-button" disabled>Process Files</button>
+            
+            <div id="export-buttons" class="hidden" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+                <button class="export-button" onclick="exportSummaryWord()" style="margin-top: 0;">
+                    <span>📊</span>
+                    <span>Export Summary Word</span>
+                </button>
+                <button class="export-button" onclick="exportDetailedWord()" style="margin-top: 0;">
+                    <span>👥</span>
+                    <span>Export Advisor Word</span>
+                </button>
+            </div>
+            
+            <div id="progress-container" class="hidden">
+                <div class="progress-bar">
+                    <div class="progress-fill"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Alert Reasons Section -->
+        <div id="alert-reasons-section" class="card hidden">
+            <h2 class="section-title">Alert Reasons Overview</h2>
+            <div id="alert-reasons-content"></div>
+        </div>
+        
+        <!-- Cases by Office Section -->
+        <div id="cases-per-advisor-section" class="card hidden">
+            <h2 class="section-title">Cases by Office</h2>
+            <div style="font-size: 0.875rem; color: #6b7280; font-style: italic; margin-bottom: 1rem; padding: 0.75rem; background-color: #f9fafb; border-left: 3px solid #3b82f6; border-radius: 0.25rem;">
+                Note: Cases assigned to advisors from multiple departments are counted once for each department involved. 
+                For example, a case assigned to advisors from both ASAP and Veteran Services will appear in totals for both departments.
+            </div>
+            <div id="cases-per-advisor-content">
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th style="text-align: left;">Advising Office</th>
+                                <th>Number of Advisors</th>
+                                <th>Total Cases</th>
+                                <th>Unique Students</th>
+                                <th>Median Cases per Advisor</th>
+                                <th>Highest Individual Case Count</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cases-per-advisor-table"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Days to Close Section -->
+        <div id="days-to-close-section" class="card hidden">
+            <div class="section-header" onclick="toggleSection('daysToClose')">
+                <h2 class="section-title">Days to Close Analysis</h2>
+                <span id="days-chevron" class="chevron">⌄</span>
+            </div>
+            
+            <div id="days-to-close-content">
+                <div style="font-size: 0.875rem; color: #6b7280; font-style: italic; margin-bottom: 1rem; padding: 0.75rem; background-color: #f9fafb; border-left: 3px solid #3b82f6; border-radius: 0.25rem;">
+                    Note: Cases assigned to advisors from multiple departments are separated into their own "Multiple Departments" category below, rather than being counted under each individual department.
+                </div>
+                <div class="subsection">
+                    <h3 class="subsection-title">By Department</h3>
+                    <div class="table-container">
+                        <table id="department-table">
+                            <thead>
+                                <tr>
+                                    <th>Department / Advisor</th>
+                                    <th>Total Cases</th>
+                                    <th>Unique Students</th>
+                                    <th>Open Cases</th>
+                                    <th>Closed Cases</th>
+                                    <th>% Closed</th>
+                                    <th>Avg Days to Close</th>
+                                </tr>
+                            </thead>
+                            <tbody id="department-table-body"></tbody>
+                        </table>
+                    </div>
+                    
+                    <div id="special-cases-table-container" class="subsection hidden">
+                        <h4 class="subsection-title">Cases with Multiple Departments or No Advisor</h4>
+                        <div class="table-container">
+                            <table id="special-cases-table">
+                                <thead>
+                                    <tr>
+                                        <th>Category</th>
+                                        <th>Total Cases</th>
+                                        <th>Unique Students</th>
+                                        <th>Open Cases</th>
+                                        <th>Closed Cases</th>
+                                        <th>% Closed</th>
+                                        <th>Avg Days to Close</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="special-cases-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Case Outcomes Section -->
+        <div id="case-outcomes-section" class="card hidden">
+            <div class="section-header" onclick="toggleSection('caseOutcomes')">
+                <h2 class="section-title">Case Outcomes</h2>
+                <span id="outcomes-chevron" class="chevron">⌄</span>
+            </div>
+            
+            <div id="case-outcomes-content">
+                <div style="font-size: 0.875rem; color: #6b7280; font-style: italic; margin-bottom: 1rem; padding: 0.75rem; background-color: #f9fafb; border-left: 3px solid #3b82f6; border-radius: 0.25rem;">
+                    Note: Cases assigned to advisors from multiple departments are separated into their own "Multiple Departments" category below, rather than being counted under each individual department.
+                </div>
+                <div class="subsection">
+                    <h3 class="subsection-title">Outcome Distribution</h3>
+                    <div id="outcome-cards" class="outcome-grid"></div>
+                </div>
+                
+                <div class="subsection">
+                    <h3 class="subsection-title">Outcomes by Department</h3>
+                    <div class="table-container">
+                        <table id="outcomes-table">
+                            <thead>
+                                <tr>
+                                    <th>Department / Advisor</th>
+                                    <th>Closed Cases</th>
+                                    <th>Unique Students</th>
+                                    <th>Connected %</th>
+                                    <th>Unable %</th>
+                                    <th>Expired %</th>
+                                    <th>Other %</th>
+                                </tr>
+                            </thead>
+                            <tbody id="outcomes-table-body"></tbody>
+                        </table>
+                    </div>
+                    
+                    <div id="special-outcomes-table-container" class="subsection hidden">
+                        <h4 class="subsection-title">Cases with Multiple Departments or No Advisor</h4>
+                        <div class="table-container">
+                            <table id="special-outcomes-table">
+                                <thead>
+                                    <tr>
+                                        <th>Category</th>
+                                        <th>Closed Cases</th>
+                                        <th>Unique Students</th>
+                                        <th>Connected %</th>
+                                        <th>Unable %</th>
+                                        <th>Expired %</th>
+                                        <th>Other %</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="special-outcomes-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================================
+        // STATE MANAGEMENT
+        // ============================================================================
+        
+        let advisorFile = null;
+        let casesFile = null;
+        let advisorData = [];
+        let casesData = [];
+        let processing = false;
+        let processed = false;
+        let expandedSections = {
+            daysToClose: true,
+            caseOutcomes: true
+        };
+        let expandedDepartments = new Set();
+
+        // ============================================================================
+        // HELPER FUNCTIONS - Formatting & Calculations
+        // ============================================================================
+        
+        /**
+         * Format a percentage value
+         */
+        function formatPercent(value, total) {
+            return total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
+        }
+
+        /**
+         * Format average days to close
+         */
+        function formatAvgDays(closedCases) {
+            if (closedCases.length === 0) return 'N/A';
+            const total = closedCases.reduce((sum, c) => sum + c.daysToClose, 0);
+            return (total / closedCases.length).toFixed(1);
+        }
+
+        /**
+         * Calculate median from array of numbers
+         */
+        function calculateMedian(numbers) {
+            if (numbers.length === 0) return 'N/A';
+            const sorted = [...numbers].sort((a, b) => a - b);
+            const mid = Math.floor(sorted.length / 2);
+            if (sorted.length % 2 === 0) {
+                return ((sorted[mid - 1] + sorted[mid]) / 2).toFixed(1);
+            }
+            return sorted[mid].toFixed(1);
+        }
+
+        /**
+         * Get background color style for percent closed values
+         */
+        function getPercentClosedColor(percentClosed) {
+            const pct = parseFloat(percentClosed);
+            if (pct >= 75) return 'background-color: #dcfce7; color: #166534; font-weight: bold;';
+            if (pct >= 40) return 'background-color: #fef3c7; color: #854d0e; font-weight: bold;';
+            return 'background-color: #fecaca; color: #991b1b; font-weight: bold;';
+        }
+
+        /**
+         * Get background color style for connected percent values
+         */
+        function getConnectedPercentColor(percent) {
+            const value = parseFloat(percent);
+            if (isNaN(value)) return '';
+            if (value >= 75) return 'background-color: #d1fae5; color: #065f46; font-weight: bold;';
+            if (value >= 40) return 'background-color: #fef3c7; color: #92400e; font-weight: bold;';
+            return 'background-color: #fee2e2; color: #991b1b; font-weight: bold;';
+        }
+
+        /**
+         * Calculate days between two dates
+         */
+        function calculateDaysBetween(startDate, endDate) {
+            return Math.floor((endDate - startDate) / (1000 * 60 * 60 * 24));
+        }
+
+        // ============================================================================
+        // HELPER FUNCTIONS - DOM Manipulation
+        // ============================================================================
+
+        /**
+         * Create a table row with multiple cells
+         */
+        function createTableRow(cells, options = {}) {
+            const { className = '', isHeader = false } = options;
+            const tag = isHeader ? 'th' : 'td';
+            const rowClass = className ? ` class="${className}"` : '';
+            
+            const cellsHtml = cells.map(cell => {
+                const align = cell.align || '';
+                const style = cell.style || '';
+                const alignClass = align ? ` class="${align}"` : '';
+                const styleAttr = style ? ` style="${style}"` : '';
+                return `<${tag}${alignClass}${styleAttr}>${cell.text}</${tag}>`;
+            }).join('');
+            
+            return `<tr${rowClass}>${cellsHtml}</tr>`;
+        }
+
+        /**
+         * Show or hide a section
+         */
+        function toggleVisibility(elementId, show) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                if (show) {
+                    element.classList.remove('hidden');
+                } else {
+                    element.classList.add('hidden');
+                }
+            }
+        }
+
+        // ============================================================================
+        // FILE UPLOAD & PROCESSING
+        // ============================================================================
+
+        /**
+         * Handle file upload events
+         */
+        function handleFileUpload(event, fileType) {
+            const file = event.target.files[0];
+            if (!file || file.type !== 'text/csv') return;
+            
+            if (fileType === 'advisor') {
+                advisorFile = file;
+                document.getElementById('advisor-filename').textContent = file.name;
+                toggleVisibility('advisor-check', true);
+            } else {
+                casesFile = file;
+                document.getElementById('cases-filename').textContent = file.name;
+                toggleVisibility('cases-check', true);
+            }
+            
+            Papa.parse(file, {
+                header: true,
+                dynamicTyping: true,
+                skipEmptyLines: true,
+                complete: (results) => {
+                    const cleanedData = results.data.map(row => {
+                        const cleanedRow = {};
+                        Object.keys(row).forEach(key => {
+                            cleanedRow[key.trim()] = row[key];
+                        });
+                        return cleanedRow;
+                    });
+                    
+                    if (fileType === 'advisor') {
+                        advisorData = cleanedData;
+                    } else {
+                        casesData = cleanedData;
+                    }
+                }
+            });
+            
+            updateProcessButton();
+        }
+
+        /**
+         * Update process button state
+         */
+        function updateProcessButton() {
+            const processButton = document.getElementById('process-button');
+            processButton.disabled = !advisorFile || !casesFile || processing;
+        }
+
+        /**
+         * Process uploaded files
+         */
+        function processFiles() {
+            if (!advisorFile || !casesFile) {
+                alert('Please upload both files before processing');
+                return;
+            }
+            
+            processing = true;
+            updateProcessButton();
+            toggleVisibility('progress-container', true);
+            
+            setTimeout(() => {
+                processing = false;
+                processed = true;
+                updateProcessButton();
+                toggleVisibility('progress-container', false);
+                
+                const enrichedData = enrichCasesData();
+                renderDashboard(enrichedData);
+            }, 1000);
+        }
+
+        // ============================================================================
+        // DATA ENRICHMENT
+        // ============================================================================
+
+        /**
+         * Create lookup map for advisors
+         */
+        function createAdvisorLookup() {
+            const advisorLookup = new Map();
+            
+            advisorData.forEach(advisor => {
+                const advisorName = advisor['Advisor Name'];
+                if (!advisorName) return;
+                
+                // Store under multiple name formats
+                advisorLookup.set(advisorName, advisor);
+                advisorLookup.set(advisorName.replace(',', '').trim(), advisor);
+                
+                if (advisor['Alternate Name']) {
+                    advisorLookup.set(advisor['Alternate Name'].trim(), advisor);
+                }
+                
+                if (advisor['First then Last']) {
+                    advisorLookup.set(advisor['First then Last'].trim(), advisor);
+                }
+            });
+            
+            return advisorLookup;
+        }
+
+        /**
+         * Match advisor name to advisor data
+         */
+        function matchAdvisor(assigneeName, advisorLookup) {
+            if (!assigneeName) return null;
+            
+            // Direct match
+            if (advisorLookup.has(assigneeName)) {
+                return advisorLookup.get(assigneeName);
+            }
+            
+            // Try different name format combinations
+            const nameParts = assigneeName.split(' ').filter(p => p);
+            if (nameParts.length >= 2) {
+                // Try "Last, First" format
+                const lastFirst = `${nameParts[0]}, ${nameParts.slice(1).join(' ')}`;
+                if (advisorLookup.has(lastFirst)) {
+                    return advisorLookup.get(lastFirst);
+                }
+                
+                // Try different combinations
+                for (let i = 1; i < nameParts.length; i++) {
+                    const possibleLast = nameParts.slice(0, i).join(' ');
+                    const possibleFirst = nameParts.slice(i).join(' ');
+                    const possibleFullName = `${possibleLast}, ${possibleFirst}`;
+                    
+                    if (advisorLookup.has(possibleFullName)) {
+                        return advisorLookup.get(possibleFullName);
+                    }
+                }
+                
+                // Try reverse (First Last format in lookup)
+                const firstLast = nameParts.join(' ');
+                if (advisorLookup.has(firstLast)) {
+                    return advisorLookup.get(firstLast);
+                }
+            }
+            
+            return null;
+        }
+
+        /**
+         * Enrich case data with advisor and timing information
+         */
+        function enrichCasesData() {
+            const advisorLookup = createAdvisorLookup();
+            const today = new Date();
+            
+            return casesData.map(caseRow => {
+                // Calculate timing metrics
+                const openedDate = new Date(caseRow['Opened At Date']);
+                let daysToClose = null;
+                let daysOpen = null;
+                
+                if (caseRow['Status'] === 'Closed' && caseRow['Closed At Date']) {
+                    const closedDate = new Date(caseRow['Closed At Date']);
+                    daysToClose = calculateDaysBetween(openedDate, closedDate);
+                } else if (caseRow['Status'] === 'Open') {
+                    daysOpen = calculateDaysBetween(openedDate, today);
+                }
+                
+                // Match advisor information
+                const assigneesList = caseRow['Case Assignees (user list)'] || '';
+                const advisorInfo = [];
+                
+                if (assigneesList.trim()) {
+                    const assignees = assigneesList.split(',').map(a => a.trim());
+                    
+                    assignees.forEach(assignee => {
+                        if (!assignee) return;
+                        
+                        const matchedAdvisor = matchAdvisor(assignee, advisorLookup);
+                        const department = matchedAdvisor ? 
+                            (matchedAdvisor.Department || 'Unknown') : 'Unknown';
+                        
+                        advisorInfo.push({
+                            name: assignee,
+                            formattedName: matchedAdvisor ? matchedAdvisor['Advisor Name'] : assignee,
+                            department: department
+                        });
+                    });
+                }
+                
+                const departments = [...new Set(advisorInfo.map(a => a.department))];
+                const sameDepartment = departments.length === 1 && departments[0] !== 'Unknown';
+                
+                return {
+                    ...caseRow,
+                    daysToClose,
+                    daysOpen,
+                    advisorInfo,
+                    departments,
+                    sameDepartment,
+                    hasNoAdvisor: advisorInfo.length === 0
+                };
+            });
+        }
+
+        // ============================================================================
+        // STATISTICS CALCULATIONS
+        // ============================================================================
+
+        /**
+         * Calculate statistics for a set of cases
+         */
+        function calculateStatsForCases(cases, label, isAdvisor = false) {
+            const openCases = cases.filter(c => c.Status === 'Open');
+            const closedCases = cases.filter(c => c.Status === 'Closed' && c.daysToClose !== null);
+            
+            // Categorize closed cases by reason
+            const connectedCases = closedCases.filter(c => 
+                c['Closed Reason']?.toLowerCase().includes('connected')
+            );
+            const unableToReachCases = closedCases.filter(c => 
+                c['Closed Reason']?.toLowerCase().includes('unable to reach') ||
+                c['Closed Reason']?.toLowerCase().includes('did not reach')
+            );
+            const expiredCases = closedCases.filter(c => 
+                c['Closed Reason']?.toLowerCase().includes('expired')
+            );
+            const otherCases = closedCases.filter(c => {
+                const reason = c['Closed Reason']?.toLowerCase() || '';
+                return !reason.includes('connected') && 
+                       !reason.includes('unable to reach') && 
+                       !reason.includes('did not reach') &&
+                       !reason.includes('expired');
+            });
+            
+            // Calculate unique students
+            const uniqueStudentIds = new Set();
+            const uniqueStudentIdsForClosed = new Set();
+            
+            cases.forEach(c => {
+                const studentId = c['Student ID'];
+                if (studentId && studentId.toString().trim()) {
+                    uniqueStudentIds.add(studentId);
+                }
+            });
+            
+            closedCases.forEach(c => {
+                const studentId = c['Student ID'];
+                if (studentId && studentId.toString().trim()) {
+                    uniqueStudentIdsForClosed.add(studentId);
+                }
+            });
+            
+            const stats = {
+                assignedCount: cases.length,
+                closedCasesForOutcomes: closedCases.length,
+                uniqueStudents: uniqueStudentIds.size,
+                uniqueStudentsForOutcomes: uniqueStudentIdsForClosed.size,
+                openCount: openCases.length,
+                closedCount: closedCases.length,
+                percentClosed: formatPercent(closedCases.length, cases.length),
+                avgDaysToClose: formatAvgDays(closedCases),
+                connectedCount: connectedCases.length,
+                connectedPct: formatPercent(connectedCases.length, closedCases.length),
+                unableToReachCount: unableToReachCases.length,
+                unableToReachPct: formatPercent(unableToReachCases.length, closedCases.length),
+                expiredCount: expiredCases.length,
+                expiredPct: formatPercent(expiredCases.length, closedCases.length),
+                otherCount: otherCases.length,
+                otherPct: formatPercent(otherCases.length, closedCases.length)
+            };
+            
+            if (isAdvisor) {
+                stats.advisor = label;
+            } else {
+                stats.department = label;
+            }
+            
+            return stats;
+        }
+
+        /**
+         * Calculate department-level statistics
+         */
+        function calculateDepartmentStats(enrichedData) {
+            const deptMap = new Map();
+            const multiDeptCases = [];
+            const noAdvisorCases = [];
+            
+            // Categorize cases by department type
+            enrichedData.forEach(caseRow => {
+                if (caseRow.hasNoAdvisor) {
+                    noAdvisorCases.push(caseRow);
+                    return;
+                }
+                
+                const advisors = caseRow.advisorInfo || [];
+                
+                if (advisors.length === 1 || (advisors.length > 1 && caseRow.sameDepartment)) {
+                    const dept = advisors[0].department;
+                    if (!deptMap.has(dept)) {
+                        deptMap.set(dept, {
+                            department: dept,
+                            cases: [],
+                            advisorCases: new Map()
+                        });
+                    }
+                    
+                    const deptData = deptMap.get(dept);
+                    deptData.cases.push(caseRow);
+                    
+                    // Track by individual advisor
+                    advisors.forEach(advisor => {
+                        const advisorName = advisor.formattedName || advisor.name;
+                        if (!deptData.advisorCases.has(advisorName)) {
+                            deptData.advisorCases.set(advisorName, []);
+                        }
+                        deptData.advisorCases.get(advisorName).push(caseRow);
+                    });
+                } else if (advisors.length > 1 && !caseRow.sameDepartment) {
+                    multiDeptCases.push(caseRow);
+                }
+            });
+            
+            // Group multi-department cases by combination
+            const multiDeptCombinations = new Map();
+            multiDeptCases.forEach(caseRow => {
+                const deptCombination = caseRow.departments.sort().join('; ');
+                if (!multiDeptCombinations.has(deptCombination)) {
+                    multiDeptCombinations.set(deptCombination, []);
+                }
+                multiDeptCombinations.get(deptCombination).push(caseRow);
+            });
+            
+            // Calculate stats for single departments
+            const singleStats = Array.from(deptMap.values()).map(dept => {
+                const deptStats = calculateStatsForCases(dept.cases, dept.department);
+                
+                // Calculate advisor-level stats
+                const advisorStats = Array.from(dept.advisorCases.entries())
+                    .map(([advisorName, advisorCases]) => {
+                        return calculateStatsForCases(advisorCases, advisorName, true);
+                    })
+                    .sort((a, b) => a.advisor.localeCompare(b.advisor));
+                
+                deptStats.advisors = advisorStats;
+                return deptStats;
+            }).sort((a, b) => a.department.localeCompare(b.department));
+            
+            // Calculate stats for multi-department cases
+            const multiDeptStats = multiDeptCases.length > 0 ? 
+                calculateStatsForCases(multiDeptCases, 'Multiple Departments') : null;
+            
+            if (multiDeptStats) {
+                const combinationStats = Array.from(multiDeptCombinations.entries())
+                    .map(([combination, cases]) => {
+                        return calculateStatsForCases(cases, combination, true);
+                    })
+                    .sort((a, b) => a.advisor.localeCompare(b.advisor));
+                
+                multiDeptStats.combinations = combinationStats;
+            }
+            
+            // Calculate stats for no advisor cases
+            const noAdvisorStats = noAdvisorCases.length > 0 ?
+                calculateStatsForCases(noAdvisorCases, 'No Advisor Listed') : null;
+            
+            // Calculate subtotals
+            const calculateSubtotal = (deptList) => {
+                const allCases = deptList.flatMap(d => d.cases || []);
+                return calculateStatsForCases(allCases, 'Subtotal');
+            };
+            
+            const singleSubtotal = calculateSubtotal(Array.from(deptMap.values()));
+            const grandTotal = calculateStatsForCases(enrichedData, 'Grand Total');
+            
+            const specialCases = [...multiDeptCases, ...noAdvisorCases];
+            const specialSubtotal = specialCases.length > 0 ?
+                calculateStatsForCases(specialCases, 'Subtotal') : null;
+            
+            return {
+                single: singleStats,
+                singleSubtotal,
+                multiDept: multiDeptStats,
+                noAdvisor: noAdvisorStats,
+                multiDeptCases,
+                specialSubtotal,
+                grandTotal
+            };
+        }
+
+        /**
+         * Calculate outcome statistics
+         */
+        function calculateOutcomeStats(enrichedData) {
+            const outcomeMap = new Map();
+            const closedCases = enrichedData.filter(c => c.Status === 'Closed');
+            
+            closedCases.forEach(c => {
+                const reason = c['Closed Reason'] || 'Unknown';
+                outcomeMap.set(reason, (outcomeMap.get(reason) || 0) + 1);
+            });
+            
+            const total = closedCases.length;
+            return Array.from(outcomeMap.entries())
+                .map(([reason, count]) => ({
+                    reason,
+                    count,
+                    percentage: formatPercent(count, total)
+                }))
+                .sort((a, b) => b.count - a.count);
+        }
+
+        // ============================================================================
+        // RENDERING FUNCTIONS
+        // ============================================================================
+
+        /**
+         * Render main dashboard
+         */
+        function renderDashboard(enrichedData) {
+            renderAlertReasons(enrichedData);
+            renderCasesPerAdvisor(enrichedData);
+            renderDaysToClose(enrichedData);
+            renderCaseOutcomes(enrichedData);
+            
+            // Show all sections
+            toggleVisibility('alert-reasons-section', true);
+            toggleVisibility('cases-per-advisor-section', true);
+            toggleVisibility('days-to-close-section', true);
+            toggleVisibility('case-outcomes-section', true);
+            toggleVisibility('export-buttons', true);
+        }
+
+        /**
+         * Render alert reasons section
+         */
+        function renderAlertReasons(enrichedData) {
+            // Calculate reason statistics
+            const reasonStats = {};
+            enrichedData.forEach(caseRow => {
+                const reason = caseRow['Referral/Alert Reasons'] || 'No Reason Specified';
+                if (!reasonStats[reason]) {
+                    reasonStats[reason] = { reason, totalCases: 0 };
+                }
+                reasonStats[reason].totalCases++;
+            });
+            
+            const reasonArray = Object.values(reasonStats)
+                .sort((a, b) => b.totalCases - a.totalCases);
+            
+            // Calculate overall statistics
+            const totalCases = enrichedData.length;
+            const totalClosed = enrichedData.filter(c => c.Status === 'Closed').length;
+            const totalOpen = enrichedData.filter(c => c.Status === 'Open').length;
+            const closedPercent = formatPercent(totalClosed, totalCases);
+            const openPercent = formatPercent(totalOpen, totalCases);
+            
+            // Calculate student metrics
+            const studentCaseCounts = new Map();
+            enrichedData.forEach(caseRow => {
+                const studentId = caseRow['Student ID'];
+                if (studentId) {
+                    studentCaseCounts.set(studentId, (studentCaseCounts.get(studentId) || 0) + 1);
+                }
+            });
+            
+            const uniqueStudents = studentCaseCounts.size;
+            const avgCasesPerStudent = uniqueStudents > 0 ? 
+                (totalCases / uniqueStudents).toFixed(2) : '0.00';
+            const studentsWithOneCase = Array.from(studentCaseCounts.values())
+                .filter(count => count === 1).length;
+            const studentsWithMultipleCases = Array.from(studentCaseCounts.values())
+                .filter(count => count > 1).length;
+            const percentOneCase = formatPercent(studentsWithOneCase, uniqueStudents);
+            const percentMultipleCases = formatPercent(studentsWithMultipleCases, uniqueStudents);
+            
+            // Build HTML
+            const container = document.getElementById('alert-reasons-content');
+            container.innerHTML = `
+                <!-- Case Status Scorecard -->
+                <div class="stats-grid" style="margin-bottom: 2rem; grid-template-columns: repeat(3, 1fr);">
+                    <div class="stat-card">
+                        <div class="stat-label">Total Cases</div>
+                        <div class="stat-value">${totalCases}</div>
+                    </div>
+                    <div class="stat-card green">
+                        <div class="stat-label">Closed Cases</div>
+                        <div class="stat-value">${totalClosed}</div>
+                        <div style="font-size: 0.9rem; color: #059669; margin-top: 0.25rem;">${closedPercent}%</div>
+                    </div>
+                    <div class="stat-card yellow">
+                        <div class="stat-label">Open Cases</div>
+                        <div class="stat-value">${totalOpen}</div>
+                        <div style="font-size: 0.9rem; color: #d97706; margin-top: 0.25rem;">${openPercent}%</div>
+                    </div>
+                </div>
+                
+                <!-- Student Metrics Scorecard -->
+                <div class="stats-grid" style="margin-bottom: 2rem; grid-template-columns: repeat(3, 1fr);">
+                    <div class="stat-card purple">
+                        <div class="stat-label">Unique Students</div>
+                        <div class="stat-value">${uniqueStudents}</div>
+                        <div style="font-size: 0.9rem; color: #7c3aed; margin-top: 0.25rem;">Avg ${avgCasesPerStudent} cases/student</div>
+                    </div>
+                    <div class="stat-card blue">
+                        <div class="stat-label">Students with 1 Case</div>
+                        <div class="stat-value">${studentsWithOneCase}</div>
+                        <div style="font-size: 0.9rem; color: #2563eb; margin-top: 0.25rem;">${percentOneCase}%</div>
+                    </div>
+                    <div class="stat-card teal">
+                        <div class="stat-label">Students with >1 Case</div>
+                        <div class="stat-value">${studentsWithMultipleCases}</div>
+                        <div style="font-size: 0.9rem; color: #0d9488; margin-top: 0.25rem;">${percentMultipleCases}%</div>
+                    </div>
+                </div>
+                
+                <!-- Alert Reason Breakdown -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                    ${reasonArray.map(reason => {
+                        const percentage = formatPercent(reason.totalCases, totalCases);
+                        return `
+                            <div class="alert-reason-card" style="text-align: center; padding: 1rem;">
+                                <h3 class="alert-reason-title" style="font-size: 0.875rem; margin-bottom: 0.5rem;">${reason.reason}</h3>
+                                <div style="font-size: 1.5rem; font-weight: bold; color: #1f2937;">${reason.totalCases}</div>
+                                <div style="font-size: 0.875rem; color: #6b7280; margin-top: 0.25rem;">${percentage}% of total</div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+        }
+
+        /**
+         * Render cases per advisor section
+         */
+        function renderCasesPerAdvisor(enrichedData) {
+            const deptMap = new Map();
+            
+            // Initialize advisor counts
+            if (advisorData && Array.isArray(advisorData)) {
+                advisorData.forEach(advisor => {
+                    const dept = advisor.Department;
+                    const advisorName = advisor['Advisor Name'];
+                    if (!dept || !advisorName) return;
+                    
+                    if (!deptMap.has(dept)) {
+                        deptMap.set(dept, {
+                            department: dept,
+                            advisors: new Map(),
+                            totalCases: 0,
+                            uniqueStudents: new Set()
+                        });
+                    }
+                    
+                    deptMap.get(dept).advisors.set(advisorName, 0);
+                });
+            }
+            
+            // Count cases per advisor per department
+            enrichedData.forEach(caseRow => {
+                if (caseRow.hasNoAdvisor) return;
+                
+                const advisors = caseRow.advisorInfo || [];
+                
+                if (advisors.length === 1 || (advisors.length > 1 && caseRow.sameDepartment)) {
+                    const dept = advisors[0].department;
+                    if (deptMap.has(dept)) {
+                        deptMap.get(dept).totalCases++;
+                        
+                        const studentId = caseRow['Student ID'];
+                        if (studentId) {
+                            deptMap.get(dept).uniqueStudents.add(studentId);
+                        }
+                        
+                        advisors.forEach(advisor => {
+                            const advisorName = advisor.formattedName || advisor.name;
+                            const deptData = deptMap.get(dept);
+                            if (deptData.advisors.has(advisorName)) {
+                                deptData.advisors.set(advisorName, 
+                                    deptData.advisors.get(advisorName) + 1);
+                            }
+                        });
+                    }
+                } else if (advisors.length > 1 && !caseRow.sameDepartment) {
+                    const uniqueDepts = new Set(advisors.map(a => a.department));
+                    uniqueDepts.forEach(dept => {
+                        if (deptMap.has(dept)) {
+                            deptMap.get(dept).totalCases++;
+                            
+                            const studentId = caseRow['Student ID'];
+                            if (studentId) {
+                                deptMap.get(dept).uniqueStudents.add(studentId);
+                            }
+                            
+                            advisors
+                                .filter(a => a.department === dept)
+                                .forEach(advisor => {
+                                    const advisorName = advisor.formattedName || advisor.name;
+                                    const deptData = deptMap.get(dept);
+                                    if (deptData.advisors.has(advisorName)) {
+                                        deptData.advisors.set(advisorName, 
+                                            deptData.advisors.get(advisorName) + 1);
+                                    }
+                                });
+                        }
+                    });
+                }
+            });
+            
+            // Build table
+            const deptArray = Array.from(deptMap.values())
+                .filter(dept => dept.advisors.size > 0)
+                .sort((a, b) => a.department.localeCompare(b.department));
+            
+            const tableBody = document.getElementById('cases-per-advisor-table');
+            let tableHTML = '';
+            
+            deptArray.forEach(dept => {
+                const advisorCaseCounts = Array.from(dept.advisors.values());
+                const advisorCount = dept.advisors.size;
+                const uniqueStudentCount = dept.uniqueStudents.size;
+                const medianCases = calculateMedian(advisorCaseCounts);
+                const highestCases = advisorCount > 0 ? Math.max(...advisorCaseCounts) : 0;
+                
+                tableHTML += `
+                    <tr>
+                        <td style="text-align: left;">${dept.department}</td>
+                        <td>${advisorCount}</td>
+                        <td>${dept.totalCases}</td>
+                        <td>${uniqueStudentCount}</td>
+                        <td>${medianCases}</td>
+                        <td>${highestCases}</td>
+                    </tr>
+                `;
+            });
+            
+            tableBody.innerHTML = tableHTML;
+        }
+
+        /**
+         * Render days to close section
+         */
+        function renderDaysToClose(enrichedData) {
+            const departmentStats = calculateDepartmentStats(enrichedData);
+            renderDepartmentTable(departmentStats);
+        }
+
+        /**
+         * Render department table for days to close
+         */
+        function renderDepartmentTable(departmentStats) {
+            const tableBody = document.getElementById('department-table-body');
+            let tableHTML = '';
+            
+            // Single department rows with advisor breakdown
+            departmentStats.single.forEach((dept, index) => {
+                const deptId = `dept-days-${index}`;
+                const hasAdvisors = dept.advisors && dept.advisors.length > 0;
+                
+                tableHTML += `
+                    <tr class="dept-row ${hasAdvisors ? 'expandable' : ''}" 
+                        data-dept="${deptId}" 
+                        ${hasAdvisors ? `onclick="toggleAdvisors('${deptId}')"` : ''}>
+                        <td>${dept.department}</td>
+                        <td>${dept.assignedCount}</td>
+                        <td>${dept.uniqueStudents}</td>
+                        <td>${dept.openCount}</td>
+                        <td>${dept.closedCount}</td>
+                        <td style="${getPercentClosedColor(dept.percentClosed)}">${dept.percentClosed}%</td>
+                        <td>${dept.avgDaysToClose}</td>
+                    </tr>
+                `;
+                
+                if (hasAdvisors) {
+                    dept.advisors.forEach(advisor => {
+                        tableHTML += `
+                            <tr class="advisor-row advisor-${deptId}" style="display: none;">
+                                <td>${advisor.advisor}</td>
+                                <td>${advisor.assignedCount}</td>
+                                <td>${advisor.uniqueStudents}</td>
+                                <td>${advisor.openCount}</td>
+                                <td>${advisor.closedCount}</td>
+                                <td style="${getPercentClosedColor(advisor.percentClosed)}">${advisor.percentClosed}%</td>
+                                <td>${advisor.avgDaysToClose}</td>
+                            </tr>
+                        `;
+                    });
+                    
+                    tableHTML += `
+                        <tr class="advisor-row advisor-${deptId}" style="display: none; background-color: #f0f9ff; font-weight: bold; color: #0369a1;">
+                            <td>Subtotal - ${dept.department}</td>
+                            <td>${dept.assignedCount}</td>
+                            <td>${dept.uniqueStudents}</td>
+                            <td>${dept.openCount}</td>
+                            <td>${dept.closedCount}</td>
+                            <td style="${getPercentClosedColor(dept.percentClosed)}">${dept.percentClosed}%</td>
+                            <td>${dept.avgDaysToClose}</td>
+                        </tr>
+                    `;
+                }
+            });
+            
+            // Add subtotal row
+            if (departmentStats.singleSubtotal) {
+                const sub = departmentStats.singleSubtotal;
+                tableHTML += `
+                    <tr class="subtotal-row" style="background-color: #f0f9ff; font-weight: bold; color: #0369a1;">
+                        <td>Subtotal - Single Departments</td>
+                        <td>${sub.assignedCount}</td>
+                        <td>${sub.uniqueStudents}</td>
+                        <td>${sub.openCount}</td>
+                        <td>${sub.closedCount}</td>
+                        <td style="${getPercentClosedColor(sub.percentClosed)}">${sub.percentClosed}%</td>
+                        <td>${sub.avgDaysToClose}</td>
+                    </tr>
+                `;
+            }
+            
+            // Add grand total if no special cases
+            if (!departmentStats.multiDept && !departmentStats.noAdvisor && departmentStats.grandTotal) {
+                const total = departmentStats.grandTotal;
+                tableHTML += `
+                    <tr class="grand-total-row" style="background-color: #e0f2fe; font-weight: bold; color: #075985;">
+                        <td>GRAND TOTAL (All Cases)</td>
+                        <td>${total.assignedCount}</td>
+                        <td>${total.uniqueStudents}</td>
+                        <td>${total.openCount}</td>
+                        <td>${total.closedCount}</td>
+                        <td style="${getPercentClosedColor(total.percentClosed)}">${total.percentClosed}%</td>
+                        <td>${total.avgDaysToClose}</td>
+                    </tr>
+                `;
+            }
+            
+            tableBody.innerHTML = tableHTML;
+            
+            // Render special cases table if needed
+            if (departmentStats.multiDept || departmentStats.noAdvisor) {
+                renderSpecialCasesTable(departmentStats);
+            }
+        }
+
+        /**
+         * Render special cases table (multi-department and no advisor)
+         */
+        function renderSpecialCasesTable(departmentStats) {
+            const container = document.getElementById('special-cases-table-container');
+            const tableBody = document.getElementById('special-cases-table-body');
+            
+            let tableHTML = '';
+            
+            if (departmentStats.multiDept) {
+                const multiDeptId = 'multi-dept-days';
+                const hasCombinations = departmentStats.multiDept.combinations && 
+                    departmentStats.multiDept.combinations.length > 0;
+                
+                const md = departmentStats.multiDept;
+                tableHTML += `
+                    <tr class="dept-row ${hasCombinations ? 'expandable' : ''}" 
+                        data-dept="${multiDeptId}" 
+                        ${hasCombinations ? `onclick="toggleAdvisors('${multiDeptId}')"` : ''}>
+                        <td>Multiple Departments</td>
+                        <td>${md.assignedCount}</td>
+                        <td>${md.uniqueStudents}</td>
+                        <td>${md.openCount}</td>
+                        <td>${md.closedCount}</td>
+                        <td style="${getPercentClosedColor(md.percentClosed)}">${md.percentClosed}%</td>
+                        <td>${md.avgDaysToClose}</td>
+                    </tr>
+                `;
+                
+                if (hasCombinations) {
+                    departmentStats.multiDept.combinations.forEach(combo => {
+                        tableHTML += `
+                            <tr class="advisor-row advisor-${multiDeptId}" style="display: none;">
+                                <td>${combo.advisor}</td>
+                                <td>${combo.assignedCount}</td>
+                                <td>${combo.uniqueStudents}</td>
+                                <td>${combo.openCount}</td>
+                                <td>${combo.closedCount}</td>
+                                <td style="${getPercentClosedColor(combo.percentClosed)}">${combo.percentClosed}%</td>
+                                <td>${combo.avgDaysToClose}</td>
+                            </tr>
+                        `;
+                    });
+                }
+            }
+            
+            if (departmentStats.noAdvisor) {
+                const na = departmentStats.noAdvisor;
+                tableHTML += `
+                    <tr class="dept-row">
+                        <td>No Advisor Listed</td>
+                        <td>${na.assignedCount}</td>
+                        <td>${na.uniqueStudents}</td>
+                        <td>${na.openCount}</td>
+                        <td>${na.closedCount}</td>
+                        <td style="${getPercentClosedColor(na.percentClosed)}">${na.percentClosed}%</td>
+                        <td>${na.avgDaysToClose}</td>
+                    </tr>
+                `;
+            }
+            
+            if (departmentStats.specialSubtotal) {
+                const sub = departmentStats.specialSubtotal;
+                tableHTML += `
+                    <tr class="subtotal-row" style="background-color: #f0f9ff; font-weight: bold; color: #0369a1;">
+                        <td>Subtotal - Special Cases</td>
+                        <td>${sub.assignedCount}</td>
+                        <td>${sub.uniqueStudents}</td>
+                        <td>${sub.openCount}</td>
+                        <td>${sub.closedCount}</td>
+                        <td style="${getPercentClosedColor(sub.percentClosed)}">${sub.percentClosed}%</td>
+                        <td>${sub.avgDaysToClose}</td>
+                    </tr>
+                `;
+            }
+            
+            if (departmentStats.grandTotal) {
+                const total = departmentStats.grandTotal;
+                tableHTML += `
+                    <tr class="grand-total-row" style="background-color: #e0f2fe; font-weight: bold; color: #075985;">
+                        <td>GRAND TOTAL (All Cases)</td>
+                        <td>${total.assignedCount}</td>
+                        <td>${total.uniqueStudents}</td>
+                        <td>${total.openCount}</td>
+                        <td>${total.closedCount}</td>
+                        <td style="${getPercentClosedColor(total.percentClosed)}">${total.percentClosed}%</td>
+                        <td>${total.avgDaysToClose}</td>
+                    </tr>
+                `;
+            }
+            
+            tableBody.innerHTML = tableHTML;
+            container.classList.remove('hidden');
+        }
+
+        /**
+         * Render case outcomes section
+         */
+        function renderCaseOutcomes(enrichedData) {
+            const outcomeStats = calculateOutcomeStats(enrichedData);
+            const departmentStats = calculateDepartmentStats(enrichedData);
+            
+            // Render outcome cards
+            const outcomeCardsContainer = document.getElementById('outcome-cards');
+            const outcomeColors = ['green', 'yellow', 'purple', 'blue', 'red', 'orange', 'pink', 'teal'];
+            outcomeCardsContainer.innerHTML = outcomeStats.map((outcome, index) => {
+                const colorClass = outcomeColors[index % outcomeColors.length];
+                return `
+                    <div class="outcome-card ${colorClass}">
+                        <div class="outcome-label">${outcome.reason}</div>
+                        <div class="outcome-value">
+                            <span class="outcome-count">${outcome.count}</span>
+                            <span class="outcome-percentage">(${outcome.percentage}%)</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            // Render outcomes table
+            renderOutcomesTable(departmentStats);
+        }
+
+        /**
+         * Render outcomes table
+         */
+        function renderOutcomesTable(departmentStats) {
+            const tableBody = document.getElementById('outcomes-table-body');
+            let tableHTML = '';
+            
+            // Single department rows with advisor breakdown
+            departmentStats.single.forEach((dept, index) => {
+                const deptId = `outcomes-dept-${index}`;
+                const hasAdvisors = dept.advisors && dept.advisors.length > 0;
+                
+                tableHTML += `
+                    <tr class="dept-row ${hasAdvisors ? 'expandable' : ''}" 
+                        data-dept="${deptId}" 
+                        ${hasAdvisors ? `onclick="toggleAdvisors('${deptId}')"` : ''}>
+                        <td>${dept.department}</td>
+                        <td>${dept.closedCasesForOutcomes}</td>
+                        <td>${dept.uniqueStudentsForOutcomes || dept.uniqueStudents}</td>
+                        <td style="${getConnectedPercentColor(dept.connectedPct)}">${dept.connectedPct}%</td>
+                        <td>${dept.unableToReachPct}%</td>
+                        <td>${dept.expiredPct}%</td>
+                        <td>${dept.otherPct}%</td>
+                    </tr>
+                `;
+                
+                if (hasAdvisors) {
+                    dept.advisors.forEach(advisor => {
+                        tableHTML += `
+                            <tr class="advisor-row advisor-${deptId}" style="display: none;">
+                                <td>${advisor.advisor}</td>
+                                <td>${advisor.closedCasesForOutcomes}</td>
+                                <td>${advisor.uniqueStudentsForOutcomes || advisor.uniqueStudents}</td>
+                                <td style="${getConnectedPercentColor(advisor.connectedPct)}">${advisor.connectedPct}%</td>
+                                <td>${advisor.unableToReachPct}%</td>
+                                <td>${advisor.expiredPct}%</td>
+                                <td>${advisor.otherPct}%</td>
+                            </tr>
+                        `;
+                    });
+                    
+                    tableHTML += `
+                        <tr class="advisor-row advisor-${deptId}" style="display: none; background-color: #f0f9ff; font-weight: bold; color: #0369a1;">
+                            <td>Subtotal - ${dept.department}</td>
+                            <td>${dept.closedCasesForOutcomes}</td>
+                            <td>${dept.uniqueStudentsForOutcomes || dept.uniqueStudents}</td>
+                            <td style="${getConnectedPercentColor(dept.connectedPct)}">${dept.connectedPct}%</td>
+                            <td>${dept.unableToReachPct}%</td>
+                            <td>${dept.expiredPct}%</td>
+                            <td>${dept.otherPct}%</td>
+                        </tr>
+                    `;
+                }
+            });
+            
+            // Add subtotal row
+            if (departmentStats.singleSubtotal) {
+                const sub = departmentStats.singleSubtotal;
+                tableHTML += `
+                    <tr class="subtotal-row" style="background-color: #f0f9ff; font-weight: bold; color: #0369a1;">
+                        <td>Subtotal - Single Departments</td>
+                        <td>${sub.closedCasesForOutcomes}</td>
+                        <td>${sub.uniqueStudentsForOutcomes || sub.uniqueStudents}</td>
+                        <td style="${getConnectedPercentColor(sub.connectedPct)}">${sub.connectedPct}%</td>
+                        <td>${sub.unableToReachPct}%</td>
+                        <td>${sub.expiredPct}%</td>
+                        <td>${sub.otherPct}%</td>
+                    </tr>
+                `;
+            }
+            
+            // Add grand total if no special cases
+            if (!departmentStats.multiDept && !departmentStats.noAdvisor && departmentStats.grandTotal) {
+                const total = departmentStats.grandTotal;
+                tableHTML += `
+                    <tr class="grand-total-row" style="background-color: #e0f2fe; font-weight: bold; color: #075985;">
+                        <td>GRAND TOTAL (All Cases)</td>
+                        <td>${total.closedCasesForOutcomes}</td>
+                        <td>${total.uniqueStudentsForOutcomes || total.uniqueStudents}</td>
+                        <td style="${getConnectedPercentColor(total.connectedPct)}">${total.connectedPct}%</td>
+                        <td>${total.unableToReachPct}%</td>
+                        <td>${total.expiredPct}%</td>
+                        <td>${total.otherPct}%</td>
+                    </tr>
+                `;
+            }
+            
+            tableBody.innerHTML = tableHTML;
+            
+            // Render special outcomes table if needed
+            if (departmentStats.multiDept || departmentStats.noAdvisor) {
+                renderSpecialOutcomesTable(departmentStats);
+            }
+        }
+
+        /**
+         * Render special outcomes table
+         */
+        function renderSpecialOutcomesTable(departmentStats) {
+            const container = document.getElementById('special-outcomes-table-container');
+            const tableBody = document.getElementById('special-outcomes-table-body');
+            
+            let tableHTML = '';
+            
+            if (departmentStats.multiDept) {
+                const multiDeptId = 'multi-dept-outcomes';
+                const hasCombinations = departmentStats.multiDept.combinations && 
+                    departmentStats.multiDept.combinations.length > 0;
+                
+                const md = departmentStats.multiDept;
+                tableHTML += `
+                    <tr class="dept-row ${hasCombinations ? 'expandable' : ''}" 
+                        data-dept="${multiDeptId}" 
+                        ${hasCombinations ? `onclick="toggleAdvisors('${multiDeptId}')"` : ''}>
+                        <td>Multiple Departments</td>
+                        <td>${md.closedCasesForOutcomes}</td>
+                        <td>${md.uniqueStudentsForOutcomes || md.uniqueStudents}</td>
+                        <td style="${getConnectedPercentColor(md.connectedPct)}">${md.connectedPct}%</td>
+                        <td>${md.unableToReachPct}%</td>
+                        <td>${md.expiredPct}%</td>
+                        <td>${md.otherPct}%</td>
+                    </tr>
+                `;
+                
+                if (hasCombinations) {
+                    departmentStats.multiDept.combinations.forEach(combo => {
+                        tableHTML += `
+                            <tr class="advisor-row advisor-${multiDeptId}" style="display: none;">
+                                <td>${combo.advisor}</td>
+                                <td>${combo.closedCasesForOutcomes}</td>
+                                <td>${combo.uniqueStudentsForOutcomes || combo.uniqueStudents}</td>
+                                <td style="${getConnectedPercentColor(combo.connectedPct)}">${combo.connectedPct}%</td>
+                                <td>${combo.unableToReachPct}%</td>
+                                <td>${combo.expiredPct}%</td>
+                                <td>${combo.otherPct}%</td>
+                            </tr>
+                        `;
+                    });
+                }
+            }
+            
+            if (departmentStats.noAdvisor) {
+                const na = departmentStats.noAdvisor;
+                tableHTML += `
+                    <tr class="dept-row">
+                        <td>No Advisor Listed</td>
+                        <td>${na.closedCasesForOutcomes}</td>
+                        <td>${na.uniqueStudentsForOutcomes || na.uniqueStudents}</td>
+                        <td style="${getConnectedPercentColor(na.connectedPct)}">${na.connectedPct}%</td>
+                        <td>${na.unableToReachPct}%</td>
+                        <td>${na.expiredPct}%</td>
+                        <td>${na.otherPct}%</td>
+                    </tr>
+                `;
+            }
+            
+            if (departmentStats.specialSubtotal) {
+                const sub = departmentStats.specialSubtotal;
+                tableHTML += `
+                    <tr class="subtotal-row" style="background-color: #f0f9ff; font-weight: bold; color: #0369a1;">
+                        <td>Subtotal - Special Cases</td>
+                        <td>${sub.closedCasesForOutcomes}</td>
+                        <td>${sub.uniqueStudentsForOutcomes || sub.uniqueStudents}</td>
+                        <td style="${getConnectedPercentColor(sub.connectedPct)}">${sub.connectedPct}%</td>
+                        <td>${sub.unableToReachPct}%</td>
+                        <td>${sub.expiredPct}%</td>
+                        <td>${sub.otherPct}%</td>
+                    </tr>
+                `;
+            }
+            
+            if (departmentStats.grandTotal) {
+                const total = departmentStats.grandTotal;
+                tableHTML += `
+                    <tr class="grand-total-row" style="background-color: #e0f2fe; font-weight: bold; color: #075985;">
+                        <td>GRAND TOTAL (All Cases)</td>
+                        <td>${total.closedCasesForOutcomes}</td>
+                        <td>${total.uniqueStudentsForOutcomes || total.uniqueStudents}</td>
+                        <td style="${getConnectedPercentColor(total.connectedPct)}">${total.connectedPct}%</td>
+                        <td>${total.unableToReachPct}%</td>
+                        <td>${total.expiredPct}%</td>
+                        <td>${total.otherPct}%</td>
+                    </tr>
+                `;
+            }
+            
+            tableBody.innerHTML = tableHTML;
+            container.classList.remove('hidden');
+        }
+
+        // ============================================================================
+        // UI INTERACTION HANDLERS
+        // ============================================================================
+
+        /**
+         * Toggle section expand/collapse
+         */
+        function toggleSection(section) {
+            expandedSections[section] = !expandedSections[section];
+            
+            const content = document.getElementById(
+                section === 'daysToClose' ? 'days-to-close-content' : 'case-outcomes-content'
+            );
+            const chevron = document.getElementById(
+                section === 'daysToClose' ? 'days-chevron' : 'outcomes-chevron'
+            );
+            
+            if (expandedSections[section]) {
+                content.classList.remove('hidden');
+                chevron.classList.remove('rotated');
+                chevron.textContent = '⌄';
+            } else {
+                content.classList.add('hidden');
+                chevron.classList.add('rotated');
+                chevron.textContent = '>';
+            }
+        }
+
+        /**
+         * Toggle advisor rows expand/collapse
+         */
+        function toggleAdvisors(deptId) {
+            const advisorRows = document.querySelectorAll(`.advisor-${deptId}`);
+            const deptRow = document.querySelector(`[data-dept="${deptId}"]`);
+            
+            if (!deptRow || advisorRows.length === 0) {
+                console.error(`Could not find elements for deptId: ${deptId}`);
+                return;
+            }
+            
+            if (expandedDepartments.has(deptId)) {
+                // Collapse
+                advisorRows.forEach(row => row.style.display = 'none');
+                deptRow.classList.remove('expanded');
+                expandedDepartments.delete(deptId);
+            } else {
+                // Expand
+                advisorRows.forEach(row => row.style.display = 'table-row');
+                deptRow.classList.add('expanded');
+                expandedDepartments.add(deptId);
+            }
+        }
+
+        // ============================================================================
+        // WORD EXPORT FUNCTIONS
+        // ============================================================================
+
+        /**
+         * Get formatted date string
+         */
+        function getFormattedDate() {
+            const today = new Date();
+            return today.toLocaleDateString('en-US', { 
+                month: 'long', 
+                day: 'numeric', 
+                year: 'numeric' 
+            });
+        }
+
+        /**
+         * Get filename date string
+         */
+        function getFilenameDateString() {
+            const today = new Date();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            const year = today.getFullYear();
+            return { month, day, year };
+        }
+
+        /**
+         * Create Word document header
+         */
+        function createWordHeader(title, subtitle) {
+            const dateString = getFormattedDate();
+            return `
+            <html xmlns:o='urn:schemas-microsoft-com:office:office' 
+                  xmlns:w='urn:schemas-microsoft-com:office:word' 
+                  xmlns='http://www.w3.org/TR/REC-html40'>
+            <head>
+                <meta charset='utf-8'>
+                <title>${title}</title>
+                <style>
+                    @page { size: 8.5in 11.0in; margin: 0.5in; }
+                    body { font-family: 'IBM Plex Sans', 'Segoe UI', sans-serif; font-size: 11pt; line-height: 1.3; color: #333; }
+                    h1 { color: #1f2937; font-size: 16pt; font-weight: 600; margin: 15px 0 8px 0; page-break-before: auto; }
+                    h2 { color: #374151; font-size: 14pt; font-weight: 600; margin: 12px 0 8px 0; }
+                    .header { text-align: center; margin-bottom: 20px; }
+                    .title { font-size: 20pt; font-weight: bold; margin: 8px 0; }
+                    .subtitle { font-size: 13pt; color: #666; margin: 4px 0; }
+                    .date { font-size: 11pt; color: #999; margin: 4px 0; }
+                    .note { font-style: italic; color: #666; margin: 8px 0; font-size: 11pt; }
+                    table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 11pt; }
+                    th { background-color: #e5e7eb; padding: 4px 6px; text-align: center; font-weight: bold; border: 1px solid #d1d5db; font-size: 11pt; }
+                    td { padding: 3px 5px; border: 1px solid #d1d5db; font-size: 11pt; }
+                    .center { text-align: center; }
+                    .success { background-color: #d4edda; }
+                    .warning { background-color: #fff3cd; }
+                    .danger { background-color: #f8d7da; }
+                    .light-blue { background-color: #e6f3ff; }
+                    .light-green { background-color: #e6ffe6; }
+                    .light-red { background-color: #ffe6e6; }
+                    .light-purple { background-color: #f3e6ff; }
+                    .light-yellow { background-color: #fff3e6; }
+                    .subtotal-row { background-color: #e5e7eb; font-weight: bold; }
+                    .total-row { background-color: #e5e7eb; font-weight: bold; }
+                    .page-break { page-break-before: always; }
+                    .stats-table { margin: 10px 0; border: 1px solid #d1d5db; }
+                    .stats-table td { padding: 10px; text-align: center; font-size: 11pt; border: 1px solid #d1d5db; vertical-align: top; }
+                    .stats-label { font-weight: normal; color: #666; font-size: 11pt; }
+                    .stats-value { font-weight: bold; font-size: 18pt; color: #1f2937; display: block; margin: 4px 0; }
+                    .stats-percent { font-size: 10pt; color: #666; }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <div class="title">${title}</div>
+                    <div class="subtitle">${subtitle}</div>
+                    <div class="date">${dateString}</div>
+                </div>
+            `;
+        }
+
+        /**
+         * Export summary Word document
+         */
+        function exportSummaryWord() {
+            let htmlContent = createWordHeader(
+                'Faculty Initiated Cases - Overview',
+                'Josh Goldblatt, Academic Affairs'
+            );
+            
+            // Alert Reasons Overview
+            const alertSection = document.getElementById('alert-reasons-section');
+            if (alertSection && !alertSection.classList.contains('hidden')) {
+                htmlContent += `
+                <h1>Alert Reasons Overview</h1>
+                <p class="note">The overview data includes all students, including those with multiple advising offices.</p>
+                <p class="note">Cases may be generated from Ad Hoc Alerts or Progress Reports.</p>
+                `;
+                
+                // Add stat cards
+                const statCards = document.querySelectorAll('#alert-reasons-content .stat-card');
+                
+                if (statCards.length > 0) {
+                    htmlContent += '<table class="stats-table"><tr>';
+                    
+                    statCards.forEach(card => {
+                        const labelElem = card.querySelector('.stat-label');
+                        const valueElem = card.querySelector('.stat-value');
+                        
+                        if (labelElem && valueElem) {
+                            const label = labelElem.textContent || '';
+                            const value = valueElem.textContent || '';
+                            
+                            let percent = '';
+                            const allDivs = card.querySelectorAll('div');
+                            allDivs.forEach(div => {
+                                const style = div.getAttribute('style') || '';
+                                if (style.includes('font-size: 0.9rem')) {
+                                    percent = div.textContent || '';
+                                }
+                            });
+                            
+                            let bgColor = 'light-blue';
+                            if (label.includes('Closed')) bgColor = 'light-green';
+                            else if (label.includes('Open')) bgColor = 'light-red';
+                            else if (label.includes('Unique')) bgColor = 'light-purple';
+                            
+                            htmlContent += '<td class="' + bgColor + '" style="width: 25%;">';
+                            htmlContent += '<div class="stats-label">' + label + '</div>';
+                            htmlContent += '<div class="stats-value">' + value + '</div>';
+                            if (percent) {
+                                htmlContent += '<div class="stats-percent">' + percent + '</div>';
+                            }
+                            htmlContent += '</td>';
+                        }
+                    });
+                    
+                    htmlContent += '</tr></table>';
+                }
+                
+                // Add alert reasons table
+                htmlContent += '<table><thead><tr>';
+                htmlContent += '<th>Alert Reason</th>';
+                htmlContent += '<th>Total Cases</th>';
+                htmlContent += '<th>Percentage of Total</th>';
+                htmlContent += '</tr></thead><tbody>';
+                
+                const alertCards = document.querySelectorAll('.alert-reason-card');
+                let hasAlertData = false;
+                
+                alertCards.forEach(card => {
+                    const titleElem = card.querySelector('.alert-reason-title');
+                    const divs = card.querySelectorAll('div');
+                    
+                    if (titleElem && divs.length >= 2) {
+                        const title = titleElem.textContent || '';
+                        const cases = divs[0].textContent || '';
+                        const percent = divs[1].textContent || '';
+                        
+                        if (title && cases) {
+                            hasAlertData = true;
+                            htmlContent += '<tr>';
+                            htmlContent += '<td>' + title + '</td>';
+                            htmlContent += '<td class="center">' + cases + '</td>';
+                            htmlContent += '<td class="center">' + percent + '</td>';
+                            htmlContent += '</tr>';
+                        }
+                    }
+                });
+                
+                if (!hasAlertData) {
+                    htmlContent += '<tr><td colspan="3" class="center">No alert data available</td></tr>';
+                }
+                
+                htmlContent += '</tbody></table>';
+            }
+            
+            // Cases Per Advisor by Office
+            const casesSection = document.getElementById('cases-per-advisor-section');
+            if (casesSection && !casesSection.classList.contains('hidden')) {
+                htmlContent += `
+                <h1>Cases Per Advisor by Office</h1>
+                <p class="note">The following table includes only students assigned to one advising office.</p>
+                <table><thead><tr>
+                    <th>Advising Office</th>
+                    <th>Number of Advisors</th>
+                    <th>Total Cases</th>
+                    <th>Unique Students</th>
+                    <th>Median Cases per Advisor</th>
+                    <th>Highest Individual Case Count</th>
+                </tr></thead><tbody>`;
+                
+                const casesTable = document.getElementById('cases-per-advisor-table');
+                if (casesTable) {
+                    const rows = casesTable.querySelectorAll('tr');
+                    rows.forEach(row => {
+                        const cells = row.querySelectorAll('td');
+                        if (cells.length >= 6) {
+                            htmlContent += '<tr>';
+                            cells.forEach((cell, idx) => {
+                                const align = idx === 0 ? '' : ' class="center"';
+                                htmlContent += `<td${align}>${cell.textContent}</td>`;
+                            });
+                            htmlContent += '</tr>';
+                        }
+                    });
+                }
+                htmlContent += '</tbody></table>';
+            }
+            
+            // Days to Close Analysis
+            htmlContent += addDaysToCloseSection();
+            
+            // Case Outcomes
+            htmlContent += addCaseOutcomesSection();
+            
+            htmlContent += '</body></html>';
+            
+            // Create and download file
+            downloadWordFile(htmlContent, 'Overview');
+        }
+
+        /**
+         * Add days to close section to Word export
+         */
+        function addDaysToCloseSection() {
+            const daysSection = document.getElementById('days-to-close-section');
+            if (!daysSection || daysSection.classList.contains('hidden')) return '';
+            
+            let html = `
+            <h1>Days to Close - Department Summary</h1>
+            <p class="note">Cases assigned to advisors from multiple departments are separated into their own category rather than being counted under each individual department.</p>
+            <table><thead><tr>
+                <th>Advising Office</th>
+                <th>Total Cases</th>
+                <th>Unique Students</th>
+                <th>Open Cases</th>
+                <th>Closed Cases</th>
+                <th>% Closed</th>
+                <th>Avg Days to Close</th>
+            </tr></thead><tbody>`;
+            
+            const deptTable = document.getElementById('department-table');
+            if (deptTable) {
+                const rows = deptTable.querySelectorAll('tr:not(.advisor-row)');
+                rows.forEach(row => {
+                    const cells = row.querySelectorAll('td');
+                    if (cells.length >= 7) {
+                        const percentClosed = parseFloat(cells[5].textContent);
+                        let statusClass = '';
+                        if (percentClosed >= 75) statusClass = 'success';
+                        else if (percentClosed >= 50) statusClass = 'warning';
+                        else if (percentClosed > 0) statusClass = 'danger';
+                        
+                        const isSpecialRow = row.classList.contains('subtotal-row') || 
+                            row.classList.contains('grand-total-row') ||
+                            cells[0].textContent.includes('Subtotal') || 
+                            cells[0].textContent.includes('TOTAL');
+                        
+                        if (isSpecialRow) {
+                            html += '<tr style="background-color: #e5e7eb; font-weight: bold;">';
+                        } else {
+                            html += '<tr>';
+                        }
+                        
+                        cells.forEach((cell, idx) => {
+                            const align = idx === 0 ? '' : ' class="center"';
+                            const bgClass = idx === 5 && statusClass && !isSpecialRow ? 
+                                ` class="center ${statusClass}"` : align;
+                            html += `<td${bgClass}>${cell.textContent}</td>`;
+                        });
+                        html += '</tr>';
+                    }
+                });
+            }
+            
+            // Add special cases table
+            const specialTable = document.getElementById('special-cases-table');
+            if (specialTable) {
+                const specialRows = specialTable.querySelectorAll('tr:not(.advisor-row)');
+                specialRows.forEach(row => {
+                    const cells = row.querySelectorAll('td');
+                    if (cells.length >= 7) {
+                        const percentClosed = parseFloat(cells[5].textContent);
+                        let statusClass = '';
+                        if (percentClosed >= 75) statusClass = 'success';
+                        else if (percentClosed >= 50) statusClass = 'warning';
+                        else if (percentClosed > 0) statusClass = 'danger';
+                        
+                        const isSpecialRow = row.classList.contains('special-subtotal-row') || 
+                            row.classList.contains('subtotal-row') ||
+                            cells[0].textContent.includes('Subtotal') || 
+                            cells[0].textContent.includes('TOTAL');
+                        
+                        if (isSpecialRow) {
+                            html += '<tr style="background-color: #e5e7eb; font-weight: bold;">';
+                        } else {
+                            html += '<tr>';
+                        }
+                        
+                        cells.forEach((cell, idx) => {
+                            const align = idx === 0 ? '' : ' class="center"';
+                            const bgClass = idx === 5 && statusClass && !isSpecialRow ? 
+                                ` class="center ${statusClass}"` : align;
+                            html += `<td${bgClass}>${cell.textContent}</td>`;
+                        });
+                        html += '</tr>';
+                    }
+                });
+            }
+            html += '</tbody></table>';
+            
+            return html;
+        }
+
+        /**
+         * Add case outcomes section to Word export
+         */
+        function addCaseOutcomesSection() {
+            const outcomesSection = document.getElementById('case-outcomes-section');
+            if (!outcomesSection || outcomesSection.classList.contains('hidden')) return '';
+            
+            let html = `
+            <h1>Case Outcomes - Department Summary</h1>
+            <p class="note">Cases assigned to advisors from multiple departments are separated into their own category rather than being counted under each individual department.</p>
+            <table><thead><tr>
+                <th>Advising Office</th>
+                <th>Closed Cases</th>
+                <th>Unique Students</th>
+                <th>Connected %</th>
+                <th>Unable %</th>
+                <th>Expired %</th>
+                <th>Other %</th>
+            </tr></thead><tbody>`;
+            
+            const outcomesTable = document.getElementById('outcomes-table');
+            if (outcomesTable) {
+                const rows = outcomesTable.querySelectorAll('tr:not(.advisor-row)');
+                rows.forEach(row => {
+                    const cells = row.querySelectorAll('td');
+                    if (cells.length >= 7) {
+                        const connectedPct = parseFloat(cells[3].textContent);
+                        let statusClass = '';
+                        if (connectedPct >= 50) statusClass = 'success';
+                        else if (connectedPct >= 30) statusClass = 'warning';
+                        else if (connectedPct > 0) statusClass = 'danger';
+                        
+                        const isSpecialRow = row.classList.contains('subtotal-row') || 
+                            row.classList.contains('grand-total-row') ||
+                            cells[0].textContent.includes('Subtotal') || 
+                            cells[0].textContent.includes('TOTAL');
+                        
+                        if (isSpecialRow) {
+                            html += '<tr style="background-color: #e5e7eb; font-weight: bold;">';
+                        } else {
+                            html += '<tr>';
+                        }
+                        
+                        cells.forEach((cell, idx) => {
+                            const align = idx === 0 ? '' : ' class="center"';
+                            const bgClass = idx === 3 && statusClass && !isSpecialRow ? 
+                                ` class="center ${statusClass}"` : align;
+                            html += `<td${bgClass}>${cell.textContent}</td>`;
+                        });
+                        html += '</tr>';
+                    }
+                });
+            }
+            
+            // Add special outcomes table
+            const specialOutcomesTable = document.getElementById('special-outcomes-table');
+            if (specialOutcomesTable) {
+                const specialRows = specialOutcomesTable.querySelectorAll('tr:not(.advisor-row)');
+                specialRows.forEach(row => {
+                    const cells = row.querySelectorAll('td');
+                    if (cells.length >= 7) {
+                        const connectedPct = parseFloat(cells[3].textContent);
+                        let statusClass = '';
+                        if (connectedPct >= 50) statusClass = 'success';
+                        else if (connectedPct >= 30) statusClass = 'warning';
+                        else if (connectedPct > 0) statusClass = 'danger';
+                        
+                        const isSpecialRow = row.classList.contains('special-subtotal-row') || 
+                            row.classList.contains('subtotal-row') ||
+                            cells[0].textContent.includes('Subtotal') || 
+                            cells[0].textContent.includes('TOTAL');
+                        
+                        if (isSpecialRow) {
+                            html += '<tr style="background-color: #e5e7eb; font-weight: bold;">';
+                        } else {
+                            html += '<tr>';
+                        }
+                        
+                        cells.forEach((cell, idx) => {
+                            const align = idx === 0 ? '' : ' class="center"';
+                            const bgClass = idx === 3 && statusClass && !isSpecialRow ? 
+                                ` class="center ${statusClass}"` : align;
+                            html += `<td${bgClass}>${cell.textContent}</td>`;
+                        });
+                        html += '</tr>';
+                    }
+                });
+            }
+            html += '</tbody></table>';
+            
+            return html;
+        }
+
+        /**
+         * Export detailed Word document (advisor-level)
+         */
+        function exportDetailedWord() {
+            let htmlContent = createWordHeader(
+                'Faculty Initiated Cases - Advisor-level Detail',
+                'Josh Goldblatt, Academic Affairs'
+            );
+            
+            htmlContent += '<p class="note">Cases assigned to advisors from multiple departments are listed separately with their combined office assignments.</p>';
+            
+            // Days to Close Analysis - Advisor Level
+            htmlContent += `
+            <h1>Days to Close Analysis</h1>
+            <table><thead><tr>
+                <th>Advisor</th>
+                <th>Office</th>
+                <th>Total Cases</th>
+                <th>Unique Students</th>
+                <th>Open Cases</th>
+                <th>Closed Cases</th>
+                <th>% Closed</th>
+                <th>Avg Days to Close</th>
+            </tr></thead><tbody>`;
+            
+            // Helper to add advisor rows from a table with department lookup
+            function getAdvisorDaysRows(table, classPrefix, deptPrefix, advisorDeptMap) {
+                let rows = '';
+                if (!table) return rows;
+                const advisorRows = table.querySelectorAll('.advisor-row');
+                advisorRows.forEach(row => {
+                    const cells = row.querySelectorAll('td');
+                    if (cells.length > 0) {
+                        const advisorName = cells[0].textContent.trim();
+                        const isSubtotalRow = advisorName.includes('Subtotal');
+                        
+                        let deptName = "Unknown";
+                        const classList = Array.from(row.classList);
+                        const advisorClass = classList.find(c => c.startsWith(classPrefix));
+                        if (advisorClass) {
+                            const deptId = advisorClass.replace(classPrefix, '');
+                            const deptRow = table.querySelector(`[data-dept="${deptPrefix}${deptId}"]`);
+                            if (deptRow) {
+                                deptName = deptRow.querySelector('td').textContent.trim();
+                            }
+                        }
+                        
+                        if (!isSubtotalRow) {
+                            advisorDeptMap.set(advisorName, deptName);
+                        }
+                        
+                        if (isSubtotalRow) {
+                            rows += `<tr style="background-color: #e5e7eb; font-weight: bold;">
+                                <td colspan="2">${advisorName}</td>
+                                <td class="center">${cells[1].textContent}</td>
+                                <td class="center">${cells[2].textContent}</td>
+                                <td class="center">${cells[3].textContent}</td>
+                                <td class="center">${cells[4].textContent}</td>
+                                <td class="center">${cells[5].textContent}</td>
+                                <td class="center">${cells[6].textContent}</td>
+                            </tr>`;
+                        } else {
+                            const percentClosed = parseFloat(cells[5].textContent);
+                            let statusClass = '';
+                            if (percentClosed >= 75) statusClass = 'success';
+                            else if (percentClosed >= 50) statusClass = 'warning';
+                            else if (percentClosed > 0) statusClass = 'danger';
+                            
+                            rows += `<tr>
+                                <td>${advisorName}</td>
+                                <td>${deptName}</td>
+                                <td class="center">${cells[1].textContent}</td>
+                                <td class="center">${cells[2].textContent}</td>
+                                <td class="center">${cells[3].textContent}</td>
+                                <td class="center">${cells[4].textContent}</td>
+                                <td class="center ${statusClass}">${cells[5].textContent}</td>
+                                <td class="center">${cells[6].textContent}</td>
+                            </tr>`;
+                        }
+                    }
+                });
+                return rows;
+            }
+            
+            // Helper to add subtotal/total rows from a table
+            function getSubtotalDaysRows(table) {
+                let rows = '';
+                if (!table) return rows;
+                const allRows = table.querySelectorAll('tr:not(.advisor-row)');
+                allRows.forEach(row => {
+                    const cells = row.querySelectorAll('td');
+                    if (cells.length >= 7) {
+                        const cellText = cells[0].textContent.trim();
+                        const isSubtotal = row.classList.contains('subtotal-row') || 
+                            row.classList.contains('grand-total-row') ||
+                            row.classList.contains('special-subtotal-row') ||
+                            cellText.includes('Subtotal') || 
+                            cellText.includes('TOTAL');
+                        
+                        if (isSubtotal) {
+                            rows += `<tr style="background-color: #e5e7eb; font-weight: bold;">
+                                <td colspan="2">${cellText}</td>
+                                <td class="center">${cells[1].textContent}</td>
+                                <td class="center">${cells[2].textContent}</td>
+                                <td class="center">${cells[3].textContent}</td>
+                                <td class="center">${cells[4].textContent}</td>
+                                <td class="center">${cells[5].textContent}</td>
+                                <td class="center">${cells[6].textContent}</td>
+                            </tr>`;
+                        }
+                    }
+                });
+                return rows;
+            }
+            
+            // Build advisor-department map (used for outcomes section too)
+            const advisorDeptMap = new Map();
+            const deptTable = document.getElementById('department-table');
+            
+            // Single-department advisor rows
+            htmlContent += getAdvisorDaysRows(deptTable, 'advisor-dept-days-', 'dept-days-', advisorDeptMap);
+            
+            // Subtotal for single departments
+            htmlContent += getSubtotalDaysRows(deptTable);
+            
+            // Multi-department section separator and rows
+            const specialTable = document.getElementById('special-cases-table');
+            if (specialTable) {
+                const specialAdvisorRows = specialTable.querySelectorAll('.advisor-row');
+                if (specialAdvisorRows.length > 0) {
+                    // Section separator
+                    htmlContent += `<tr style="background-color: #dbeafe; font-weight: bold;">
+                        <td colspan="8" style="text-align: center; font-style: italic;">Multiple Departments / Special Cases</td>
+                    </tr>`;
+                    
+                    // For multi-dept cases, the "advisor" name is actually the dept combination
+                    // We need to swap: put combo in Office column, leave Advisor as the combo label
+                    specialAdvisorRows.forEach(row => {
+                        const cells = row.querySelectorAll('td');
+                        if (cells.length > 0) {
+                            const comboName = cells[0].textContent.trim();
+                            
+                            // Determine parent category (Multiple Departments vs No Advisor)
+                            let parentCategory = "Unknown";
+                            const classList = Array.from(row.classList);
+                            const advisorClass = classList.find(c => c.startsWith('advisor-special-days-'));
+                            if (advisorClass) {
+                                const deptId = advisorClass.replace('advisor-special-days-', '');
+                                const deptRow = specialTable.querySelector(`[data-dept="special-days-${deptId}"]`);
+                                if (deptRow) {
+                                    parentCategory = deptRow.querySelector('td').textContent.trim();
+                                }
+                            }
+                            
+                            // For multi-dept combos, the combo IS the office
+                            const officeName = comboName;
+                            advisorDeptMap.set(comboName, officeName);
+                            
+                            const percentClosed = parseFloat(cells[5].textContent);
+                            let statusClass = '';
+                            if (percentClosed >= 75) statusClass = 'success';
+                            else if (percentClosed >= 50) statusClass = 'warning';
+                            else if (percentClosed > 0) statusClass = 'danger';
+                            
+                            htmlContent += `<tr>
+                                <td>(Multi-office)</td>
+                                <td>${officeName}</td>
+                                <td class="center">${cells[1].textContent}</td>
+                                <td class="center">${cells[2].textContent}</td>
+                                <td class="center">${cells[3].textContent}</td>
+                                <td class="center">${cells[4].textContent}</td>
+                                <td class="center ${statusClass}">${cells[5].textContent}</td>
+                                <td class="center">${cells[6].textContent}</td>
+                            </tr>`;
+                        }
+                    });
+                }
+                
+                // Special cases subtotals
+                htmlContent += getSubtotalDaysRows(specialTable);
+            }
+            
+            htmlContent += '</tbody></table>';
+            
+            // Case Outcomes - Advisor Level
+            htmlContent += `
+            <div class="page-break"></div>
+            <h1>Case Outcomes</h1>
+            <table><thead><tr>
+                <th>Advisor</th>
+                <th>Office</th>
+                <th>Closed Cases</th>
+                <th>Unique Students</th>
+                <th>Connected %</th>
+                <th>Unable %</th>
+                <th>Expired %</th>
+                <th>Other %</th>
+            </tr></thead><tbody>`;
+            
+            // Helper for outcomes advisor rows
+            function getAdvisorOutcomesRows(table, classPrefix, deptPrefix) {
+                let rows = '';
+                if (!table) return rows;
+                const advisorRows = table.querySelectorAll('.advisor-row');
+                advisorRows.forEach(row => {
+                    const cells = row.querySelectorAll('td');
+                    if (cells.length > 0) {
+                        const advisorName = cells[0].textContent.trim();
+                        const isSubtotalRow = advisorName.includes('Subtotal');
+                        let deptName = advisorDeptMap.get(advisorName) || "Unknown";
+                        
+                        if (deptName === "Unknown" && !isSubtotalRow) {
+                            const classList = Array.from(row.classList);
+                            const advisorClass = classList.find(c => c.startsWith(classPrefix));
+                            if (advisorClass) {
+                                const deptId = advisorClass.replace(classPrefix, '');
+                                const deptRow = table.querySelector(`[data-dept="${deptPrefix}${deptId}"]`);
+                                if (deptRow) {
+                                    deptName = deptRow.querySelector('td').textContent.trim();
+                                }
+                            }
+                        }
+                        
+                        if (isSubtotalRow) {
+                            rows += `<tr style="background-color: #e5e7eb; font-weight: bold;">
+                                <td colspan="2">${advisorName}</td>
+                                <td class="center">${cells[1].textContent}</td>
+                                <td class="center">${cells[2].textContent}</td>
+                                <td class="center">${cells[3].textContent}</td>
+                                <td class="center">${cells[4].textContent}</td>
+                                <td class="center">${cells[5].textContent}</td>
+                                <td class="center">${cells[6].textContent}</td>
+                            </tr>`;
+                        } else {
+                            const connectedPct = parseFloat(cells[3].textContent);
+                            let statusClass = '';
+                            if (connectedPct >= 50) statusClass = 'success';
+                            else if (connectedPct >= 30) statusClass = 'warning';
+                            else if (connectedPct > 0) statusClass = 'danger';
+                            
+                            rows += `<tr>
+                                <td>${advisorName}</td>
+                                <td>${deptName}</td>
+                                <td class="center">${cells[1].textContent}</td>
+                                <td class="center">${cells[2].textContent}</td>
+                                <td class="center ${statusClass}">${cells[3].textContent}</td>
+                                <td class="center">${cells[4].textContent}</td>
+                                <td class="center">${cells[5].textContent}</td>
+                                <td class="center">${cells[6].textContent}</td>
+                            </tr>`;
+                        }
+                    }
+                });
+                return rows;
+            }
+            
+            // Helper for outcomes subtotal rows
+            function getSubtotalOutcomesRows(table) {
+                let rows = '';
+                if (!table) return rows;
+                const allRows = table.querySelectorAll('tr:not(.advisor-row)');
+                allRows.forEach(row => {
+                    const cells = row.querySelectorAll('td');
+                    if (cells.length >= 7) {
+                        const cellText = cells[0].textContent.trim();
+                        const isSubtotal = row.classList.contains('subtotal-row') || 
+                            row.classList.contains('grand-total-row') ||
+                            row.classList.contains('special-subtotal-row') ||
+                            cellText.includes('Subtotal') || 
+                            cellText.includes('TOTAL');
+                        
+                        if (isSubtotal) {
+                            rows += `<tr style="background-color: #e5e7eb; font-weight: bold;">
+                                <td colspan="2">${cellText}</td>
+                                <td class="center">${cells[1].textContent}</td>
+                                <td class="center">${cells[2].textContent}</td>
+                                <td class="center">${cells[3].textContent}</td>
+                                <td class="center">${cells[4].textContent}</td>
+                                <td class="center">${cells[5].textContent}</td>
+                                <td class="center">${cells[6].textContent}</td>
+                            </tr>`;
+                        }
+                    }
+                });
+                return rows;
+            }
+            
+            const outcomesTable = document.getElementById('outcomes-table');
+            
+            // Single-department advisor rows
+            htmlContent += getAdvisorOutcomesRows(outcomesTable, 'advisor-dept-outcomes-', 'dept-outcomes-');
+            
+            // Subtotal for single departments
+            htmlContent += getSubtotalOutcomesRows(outcomesTable);
+            
+            // Multi-department section for outcomes
+            const specialOutcomesTable = document.getElementById('special-outcomes-table');
+            if (specialOutcomesTable) {
+                const specialAdvisorRows = specialOutcomesTable.querySelectorAll('.advisor-row');
+                if (specialAdvisorRows.length > 0) {
+                    // Section separator
+                    htmlContent += `<tr style="background-color: #dbeafe; font-weight: bold;">
+                        <td colspan="8" style="text-align: center; font-style: italic;">Multiple Departments / Special Cases</td>
+                    </tr>`;
+                    
+                    specialAdvisorRows.forEach(row => {
+                        const cells = row.querySelectorAll('td');
+                        if (cells.length > 0) {
+                            const comboName = cells[0].textContent.trim();
+                            const officeName = advisorDeptMap.get(comboName) || comboName;
+                            
+                            const connectedPct = parseFloat(cells[3].textContent);
+                            let statusClass = '';
+                            if (connectedPct >= 50) statusClass = 'success';
+                            else if (connectedPct >= 30) statusClass = 'warning';
+                            else if (connectedPct > 0) statusClass = 'danger';
+                            
+                            htmlContent += `<tr>
+                                <td>(Multi-office)</td>
+                                <td>${officeName}</td>
+                                <td class="center">${cells[1].textContent}</td>
+                                <td class="center">${cells[2].textContent}</td>
+                                <td class="center ${statusClass}">${cells[3].textContent}</td>
+                                <td class="center">${cells[4].textContent}</td>
+                                <td class="center">${cells[5].textContent}</td>
+                                <td class="center">${cells[6].textContent}</td>
+                            </tr>`;
+                        }
+                    });
+                }
+                
+                // Special cases subtotals
+                htmlContent += getSubtotalOutcomesRows(specialOutcomesTable);
+            }
+            
+            htmlContent += '</tbody></table></body></html>';
+            
+            // Create and download file
+            downloadWordFile(htmlContent, 'Advisor');
+        }
+
+        /**
+         * Download Word file
+         */
+        function downloadWordFile(htmlContent, reportType) {
+            const blob = new Blob([htmlContent], { type: 'application/msword' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const { month, day, year } = getFilenameDateString();
+            a.href = url;
+            a.download = `Faculty Initiated Cases ${reportType} Report_${month}.${day}.${year}.doc`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // ============================================================================
+        // EVENT LISTENERS
+        // ============================================================================
+
+        document.getElementById('advisor-upload').addEventListener('change', (e) => handleFileUpload(e, 'advisor'));
+        document.getElementById('cases-upload').addEventListener('change', (e) => handleFileUpload(e, 'cases'));
+        document.getElementById('process-button').addEventListener('click', processFiles);
+    </script>
+</body>
+</html>
