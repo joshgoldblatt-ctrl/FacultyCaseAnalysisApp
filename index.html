@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <!--
     LaGuardia Faculty Cases Analysis
-    Version 2.14 - Released February 27, 2026
+    Version 2.15 - Released March 6, 2026
     Developed by Josh Goldblatt using Claude
     
     Version History:
+    v2.15 - Added collapsible Version History changelog dropdown to app
     v2.14 - Fixed Referral/Alert Reasons column name to match current CSV format
     v2.13 - Fixed advisor export subtotal shading, multi-office labeling, 
             updated notes for multi-department case handling, filename formatting
@@ -14,7 +15,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LaGuardia Faculty Case Analysis Dashboard v2.14</title>
+    <title>LaGuardia Faculty Case Analysis Dashboard v2.15</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
@@ -177,6 +178,10 @@
 
         .chevron.rotated {
             transform: rotate(90deg);
+        }
+
+        .changelog-arrow.open {
+            transform: rotate(180deg);
         }
 
         .stats-grid {
@@ -502,8 +507,118 @@
         <div class="card">
             <h1 class="main-title">📚 LaGuardia Faculty Case Analysis Dashboard</h1>
             <div style="text-align: center; margin-bottom: 1rem;">
-                <div style="font-size: 0.9rem; color: #6b7280;">Version 2.14 - Released February 27, 2026</div>
+                <div style="font-size: 0.9rem; color: #6b7280;">Version 2.15 - Released March 6, 2026</div>
                 <div style="font-size: 0.9rem; color: #6b7280;">Developed by Josh Goldblatt using Claude</div>
+            </div>
+            
+            <!-- Version History / Changelog -->
+            <div style="padding: 0; overflow: hidden; border: 1px solid #e5e7eb; border-radius: 0.5rem; margin-bottom: 1rem;">
+                <div onclick="document.getElementById('changelog-content').classList.toggle('hidden'); this.querySelector('.changelog-arrow').classList.toggle('open');" 
+                     style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 1rem; cursor: pointer; background-color: #f9fafb;">
+                    <h2 style="font-size: 0.9rem; font-weight: 600; color: #374151; margin: 0;">📋 Version History</h2>
+                    <span class="changelog-arrow" style="font-size: 1.25rem; transition: transform 0.2s; display: inline-block;">⌄</span>
+                </div>
+                <div id="changelog-content" class="hidden" style="padding: 1rem 1.25rem; max-height: 500px; overflow-y: auto; font-size: 0.875rem; color: #374151; line-height: 1.6; border-top: 1px solid #e5e7eb;">
+                    
+                    <div style="margin-bottom: 1.25rem;">
+                        <div style="font-weight: 700; color: #1f2937; font-size: 0.95rem; margin-bottom: 0.25rem;">v2.15 — March 6, 2026</div>
+                        <ul style="margin: 0.25rem 0 0 1.25rem; padding: 0;">
+                            <li>Added collapsible Version History changelog dropdown to the app</li>
+                        </ul>
+                    </div>
+
+                    <div style="margin-bottom: 1.25rem;">
+                        <div style="font-weight: 700; color: #1f2937; font-size: 0.95rem; margin-bottom: 0.25rem;">v2.14 — March 6, 2026</div>
+                        <ul style="margin: 0.25rem 0 0 1.25rem; padding: 0;">
+                            <li>Fixed Referral/Alert Reasons column name to match current CSV format</li>
+                        </ul>
+                    </div>
+
+                    <div style="margin-bottom: 1.25rem;">
+                        <div style="font-weight: 700; color: #1f2937; font-size: 0.95rem; margin-bottom: 0.25rem;">v2.13 — March 6, 2026</div>
+                        <ul style="margin: 0.25rem 0 0 1.25rem; padding: 0;">
+                            <li>Added notes to Days to Close and Case Outcomes sections clarifying multi-department case handling</li>
+                            <li>Fixed advisor Word export: gray shading on subtotal rows, proper multi-office labeling</li>
+                            <li>Updated Word export notes for accuracy</li>
+                            <li>Changed exported filenames to use spaces instead of underscores</li>
+                            <li>Added version header and metadata to app</li>
+                        </ul>
+                    </div>
+
+                    <div style="margin-bottom: 1.25rem;">
+                        <div style="font-weight: 700; color: #1f2937; font-size: 0.95rem; margin-bottom: 0.25rem;">v2.12 — February 6, 2026</div>
+                        <ul style="margin: 0.25rem 0 0 1.25rem; padding: 0;">
+                            <li>Fixed gray shading on subtotal and grand total rows in Word exports</li>
+                        </ul>
+                    </div>
+
+                    <div style="margin-bottom: 1.25rem;">
+                        <div style="font-weight: 700; color: #1f2937; font-size: 0.95rem; margin-bottom: 0.25rem;">v2.11 — November 15, 2025</div>
+                        <ul style="margin: 0.25rem 0 0 1.25rem; padding: 0;">
+                            <li>Added subtotal rows to single-department tables in Days to Close and Case Outcomes</li>
+                            <li>Added Grand Total row across all cases</li>
+                            <li>Renamed "Cases Per Advisor by Office" to "Cases by Office"</li>
+                            <li>Removed misleading Total row from Cases by Office table</li>
+                            <li>Updated multi-department note with specific department examples</li>
+                            <li>Word export styling: IBM Plex Sans font, 11pt default, header row shading on subtotals</li>
+                        </ul>
+                    </div>
+
+                    <div style="margin-bottom: 1.25rem;">
+                        <div style="font-weight: 700; color: #1f2937; font-size: 0.95rem; margin-bottom: 0.25rem;">v2.10 — November 15, 2025</div>
+                        <ul style="margin: 0.25rem 0 0 1.25rem; padding: 0;">
+                            <li>Replaced PDF exports with Word document exports for more reliable formatting</li>
+                            <li>Fixed unique student counting to use Student ID column consistently</li>
+                            <li>Removed scorecards from Days to Close section</li>
+                        </ul>
+                    </div>
+
+                    <div style="margin-bottom: 1.25rem;">
+                        <div style="font-weight: 700; color: #1f2937; font-size: 0.95rem; margin-bottom: 0.25rem;">v2.8 — November 14, 2025</div>
+                        <ul style="margin: 0.25rem 0 0 1.25rem; padding: 0;">
+                            <li>Refined PDF exports: portrait orientation, professional formatting</li>
+                            <li>Renamed exports to "Faculty Initiated Cases" titles</li>
+                            <li>Added contextual notes to export sections about data scope</li>
+                            <li>Color-coded performance metrics (green/yellow/red) in exports</li>
+                            <li>Removed dropdown icons from exported tables</li>
+                        </ul>
+                    </div>
+
+                    <div style="margin-bottom: 1.25rem;">
+                        <div style="font-weight: 700; color: #1f2937; font-size: 0.95rem; margin-bottom: 0.25rem;">v2.6 — November 10, 2025</div>
+                        <ul style="margin: 0.25rem 0 0 1.25rem; padding: 0;">
+                            <li>Added scorecards to Alert Reasons: unique students, average cases per student, single vs. multi-case breakdowns</li>
+                            <li>Case Outcomes column renamed to "Closed Cases" with only closed cases counted</li>
+                            <li>Added Unique Students column to Case Outcomes tables (department and advisor level)</li>
+                            <li>Added "Other" column for non-standard case outcomes</li>
+                            <li>Added Cases Per Advisor by Office table with multi-department counting note</li>
+                            <li>Added PDF export functionality (Summary and Advisor reports)</li>
+                        </ul>
+                    </div>
+
+                    <div style="margin-bottom: 1.25rem;">
+                        <div style="font-weight: 700; color: #1f2937; font-size: 0.95rem; margin-bottom: 0.25rem;">v2.0 — August 18, 2025</div>
+                        <ul style="margin: 0.25rem 0 0 1.25rem; padding: 0;">
+                            <li>Converted from React/TSX to standalone HTML application</li>
+                            <li>Improved multi-advisor case handling with same-department detection</li>
+                            <li>Added separate table for multi-department and no-advisor cases</li>
+                            <li>Collapsible department sections with advisor-level drill-down</li>
+                        </ul>
+                    </div>
+
+                    <div style="margin-bottom: 0.5rem;">
+                        <div style="font-weight: 700; color: #1f2937; font-size: 0.95rem; margin-bottom: 0.25rem;">v1.0 — August 18, 2025</div>
+                        <ul style="margin: 0.25rem 0 0 1.25rem; padding: 0;">
+                            <li>Initial build: Faculty Case Analysis Dashboard</li>
+                            <li>CSV file upload for advisor lists and case reports</li>
+                            <li>Alert Reasons Overview with visual breakdown bars</li>
+                            <li>Days to Close Analysis by department and advisor</li>
+                            <li>Case Outcomes by department and advisor</li>
+                            <li>Multi-part last name handling (e.g., "Brand Ortiz, Johanna")</li>
+                        </ul>
+                    </div>
+
+                </div>
             </div>
             
             <!-- File Upload Section -->
